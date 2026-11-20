@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 from pathlib import Path
 
@@ -24,14 +25,16 @@ assert "kUseActiveItemOffset = 0x580a28" in native
 assert "kGlowingHourglassCollectible, 0, -1, 0" in native
 assert "kGameSpawnPrologue" in native and "kUseActiveItemPrologue" in native
 assert "giveitem" in engine and "remove" in engine
+
 for command in ("spawnitem", "spawntrinket", "spawncard", "spawnrune", "spawnpill", "rewind", "restart"):
     assert command in engine
+
 assert "pocketitems.xml" in catalog
 assert "pilleffect" in catalog and '? @"pill"' in catalog
 assert "suggestionsForInput" in engine
 assert "IDCPassthroughView" in controller
 assert "toggleKeyboard:" in controller
-assert "colorWithWhite:0 alpha:0.78" in controller
+assert "colorWithWhite:0 alpha:0.62" in controller
 assert "windowLevel" not in controller or "UIWindowLevelNormal" in controller
 assert "com.Nicalis.Isaac-iOS" in bootstrap
 assert "UIKeyboardHIDUsageKeyboardGraveAccentAndTilde" in hotkey
@@ -52,12 +55,22 @@ assert "PauseSignaturesMatch" in native and "IsaacPresentation::Capture" in nati
 assert '@"aliases": @[@"rs"]' in engine
 assert "RestartSignaturesMatch" in native and "image+0x672568" in native
 assert "WritableMemory" in native and "pending ||" in native
-version = next(line.split(":", 1)[1].strip() for line in (ROOT / "package/control").read_text().splitlines() if line.startswith("Version:"))
-assert f'@"{version}"' in engine and f"Isaac Debug Console iOS {version}" in controller
+
+version = next(
+    line.split(":", 1)[1].strip()
+    for line in (ROOT / "package/control").read_text().splitlines()
+    if line.startswith("Version:")
+)
+
+assert f'@"{version}"' in engine
+assert f"Isaac Debug Console iOS {version}" in controller
+
 notes = (ROOT / f"docs/RELEASE_NOTES_v{version}.md").read_text()
 assert not notes.startswith("# ")
 
 for forbidden in ("MobileSubstrate", "substrate.h", "ElleKit", "/var/jb"):
-    assert forbidden not in "\n".join((native, engine, controller, catalog, bootstrap))
+    assert forbidden not in "\n".join(
+        (native, engine, controller, catalog, bootstrap)
+    )
 
 print("source contract tests passed")
