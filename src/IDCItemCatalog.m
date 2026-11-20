@@ -1,6 +1,11 @@
+
 #import "IDCItemCatalog.h"
 #import "IDCLogger.h"
 #import "IDCNamesZH.h"
+
+#if IDC_ITEM_CATALOG_HAS_UIKIT
+#import <UIKit/UIKit.h>
+#endif
 
 static NSArray<NSString *> *IDCResourceRoots(void) {
     return @[@"repentance-resources", @"afterbirthplus-resources",
@@ -44,10 +49,14 @@ static NSString *IDCLabelZH(NSString *label) {
 @property(nonatomic, copy) NSArray<IDCItemRecord *> *sortedPillEffects;
 @property(nonatomic) BOOL parsingPocketItems;
 @property(nonatomic, copy) NSDictionary<NSString *, NSString *> *zhNames;
+
+#if IDC_ITEM_CATALOG_HAS_UIKIT
 @property(nonatomic, strong) NSCache<NSString *, UIImage *> *iconCache;
 @property(nonatomic, copy) NSString *collectibleIconDir;
 @property(nonatomic, copy) NSString *trinketIconDir;
 @property(nonatomic) BOOL iconDirsResolved;
+#endif
+
 @end
 
 @implementation IDCItemCatalog
@@ -59,7 +68,11 @@ static NSString *IDCLabelZH(NSString *label) {
         _trinketsByID = [NSMutableDictionary dictionary];
         _pocketItemsByID = [NSMutableDictionary dictionary];
         _pillEffectsByID = [NSMutableDictionary dictionary];
+
+#if IDC_ITEM_CATALOG_HAS_UIKIT
         _iconCache = [NSCache new];
+#endif
+
         [self loadChineseNames];
         [self loadCatalog];
     }
@@ -204,7 +217,7 @@ static NSString *IDCLabelZH(NSString *label) {
  didStartElement:(NSString *)elementName
     namespaceURI:(NSString *)namespaceURI
    qualifiedName:(NSString *)qualifiedName
-      attributes:(NSDictionary<NSString *, NSString *> *)attributes {
+   attributes:(NSDictionary<NSString *, NSString *> *)attributes {
     (void)parser; (void)namespaceURI; (void)qualifiedName;
     if (self.parsingPocketItems) {
         if (![@[@"card", @"rune", @"pilleffect"] containsObject:elementName]) return;
@@ -246,6 +259,8 @@ static NSString *IDCLabelZH(NSString *label) {
         self.recordsByID[@(identifier)] = record;
     }
 }
+
+#if IDC_ITEM_CATALOG_HAS_UIKIT
 
 #pragma mark - Icons (read from the installed game at runtime)
 
@@ -300,6 +315,8 @@ static NSString *IDCLabelZH(NSString *label) {
     if (image) [self.iconCache setObject:image forKey:cacheKey];
     return image;
 }
+
+#endif
 
 #pragma mark - Lookup
 
