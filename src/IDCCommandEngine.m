@@ -4,6 +4,16 @@
 
 static NSString *const IDCVersion = @"0.4.0";
 
+// Display-only Chinese label for a record kind (the command IDs stay English).
+static NSString *IDCKindLabelZH(NSString *kind) {
+    NSDictionary<NSString *, NSString *> *labels = @{
+        @"passive": @"被动", @"active": @"主动", @"familiar": @"跟班",
+        @"trinket": @"饰品", @"card": @"卡牌", @"rune": @"符文",
+        @"pill": @"药丸", @"unknown": @"未知"
+    };
+    return labels[kind] ?: kind;
+}
+
 @implementation IDCCommandResult
 @end
 
@@ -23,69 +33,71 @@ static NSString *const IDCVersion = @"0.4.0";
     if (self) {
         _bridge = bridge;
         _catalog = catalog;
+        // "name", "aliases" and "usage" are the real commands and stay English.
+        // Only "summary" is shown to the player, so it is in Chinese.
         _commands = @[
             @{ @"name": @"help", @"aliases": @[@"?"], @"usage": @"help [command]",
-               @"summary": @"Show every command or detailed help" },
+               @"summary": @"显示全部命令，或某个命令的详细说明" },
             @{ @"name": @"status", @"aliases": @[], @"usage": @"status",
-               @"summary": @"Show native bridge, run, and catalog state" },
+               @"summary": @"显示原生桥接、当前游戏和目录状态" },
             @{ @"name": @"seed", @"aliases": @[], @"usage": @"seed",
-               @"summary": @"Show the current run seed" },
+               @"summary": @"显示本局种子" },
             @{ @"name": @"room", @"aliases": @[], @"usage": @"room",
-               @"summary": @"Show the current native room type" },
+               @"summary": @"显示当前房间类型" },
             @{ @"name": @"position", @"aliases": @[@"pos"], @"usage": @"position",
-               @"summary": @"Show player type and coordinates" },
+               @"summary": @"显示玩家类型和坐标" },
             @{ @"name": @"inventory", @"aliases": @[@"inv"], @"usage": @"inventory",
-               @"summary": @"List owned collectibles" },
+               @"summary": @"列出已拥有的道具" },
             @{ @"name": @"items", @"aliases": @[@"find"], @"usage": @"items <name|id>",
-               @"summary": @"Search collectible names and IDs" },
+               @"summary": @"按名称或 ID 搜索道具" },
             @{ @"name": @"trinkets", @"aliases": @[], @"usage": @"trinkets [name|id]",
-               @"summary": @"List or search trinkets" },
+               @"summary": @"列出或搜索饰品" },
             @{ @"name": @"cards", @"aliases": @[], @"usage": @"cards [name|id]",
-               @"summary": @"List or search cards" },
+               @"summary": @"列出或搜索卡牌" },
             @{ @"name": @"runes", @"aliases": @[], @"usage": @"runes [name|id]",
-               @"summary": @"List or search runes and soul stones" },
+               @"summary": @"列出或搜索符文和灵魂石" },
             @{ @"name": @"pilleffects", @"aliases": @[@"pills"],
                @"usage": @"pilleffects [name|id]",
-               @"summary": @"List or search pill effects" },
+               @"summary": @"列出或搜索药丸效果" },
             @{ @"name": @"giveitem", @"aliases": @[@"g"],
                @"usage": @"giveitem <cID|name>",
-               @"summary": @"Give a collectible directly to the player" },
+               @"summary": @"直接给玩家一个道具" },
             @{ @"name": @"remove", @"aliases": @[@"r"],
                @"usage": @"remove <cID|name>",
-               @"summary": @"Remove one collectible from the player" },
+               @"summary": @"移除玩家身上的一个道具" },
             @{ @"name": @"spawn", @"aliases": @[@"s"],
                @"usage": @"spawn <type.variant.subtype>",
-               @"summary": @"Spawn a native entity beside the player" },
+               @"summary": @"在玩家旁边生成原生实体" },
             @{ @"name": @"spawnpickup", @"aliases": @[@"pickup"],
                @"usage": @"spawnpickup <variant.subtype>",
-               @"summary": @"Spawn a pickup beside the player" },
+               @"summary": @"在玩家旁边生成拾取物" },
             @{ @"name": @"spawnitem", @"aliases": @[@"si"],
                @"usage": @"spawnitem <cID|name>",
-               @"summary": @"Spawn a collectible pedestal in the room" },
+               @"summary": @"在房间里生成一个道具底座" },
             @{ @"name": @"spawntrinket", @"aliases": @[@"st"],
                @"usage": @"spawntrinket <tID|name>",
-               @"summary": @"Spawn a trinket in the room" },
+               @"summary": @"在房间里生成一个饰品" },
             @{ @"name": @"spawncard", @"aliases": @[@"sc"],
                @"usage": @"spawncard <ID|name>",
-               @"summary": @"Spawn a card in the room" },
+               @"summary": @"在房间里生成一张卡牌" },
             @{ @"name": @"spawnrune", @"aliases": @[@"sr", @"spawnrun"],
                @"usage": @"spawnrune <ID|1-10|name>",
-               @"summary": @"Spawn a rune or soul stone in the room" },
+               @"summary": @"在房间里生成一个符文或灵魂石" },
             @{ @"name": @"spawnpill", @"aliases": @[@"sp"],
                @"usage": @"spawnpill <color|effect> [horse]",
-               @"summary": @"Spawn a pill from this run's pill pool" },
+               @"summary": @"从本局药丸池中生成一颗药丸" },
             @{ @"name": @"rewind", @"aliases": @[@"hourglass"], @"usage": @"rewind",
-               @"summary": @"Rewind through Isaac's Glowing Hourglass logic" },
+               @"summary": @"通过发光沙漏的逻辑回溯" },
             @{ @"name": @"restart", @"aliases": @[@"rs"], @"usage": @"restart",
-               @"summary": @"Start a fresh run with the same character and difficulty (alias: rs)" },
+               @"summary": @"用相同角色和难度开始新的一局（别名：rs）" },
             @{ @"name": @"history", @"aliases": @[], @"usage": @"history",
-               @"summary": @"Print commands used in this session" },
+               @"summary": @"显示本次使用过的命令" },
             @{ @"name": @"clear", @"aliases": @[@"cls"], @"usage": @"clear",
-               @"summary": @"Clear console output" },
+               @"summary": @"清空控制台输出" },
             @{ @"name": @"version", @"aliases": @[], @"usage": @"version",
-               @"summary": @"Show console version" },
+               @"summary": @"显示控制台版本" },
             @{ @"name": @"close", @"aliases": @[@"exit"], @"usage": @"close",
-               @"summary": @"Close the console panel" },
+               @"summary": @"关闭控制台面板" },
         ];
     }
     return self;
@@ -123,21 +135,21 @@ static NSString *const IDCVersion = @"0.4.0";
 
 - (NSString *)roomName:(NSInteger)type {
     NSDictionary<NSNumber *, NSString *> *names = @{
-        @1: @"Default", @2: @"Shop", @3: @"Error", @4: @"Treasure",
-        @5: @"Boss", @6: @"Miniboss", @7: @"Secret", @8: @"Super Secret",
-        @9: @"Arcade", @10: @"Curse", @11: @"Challenge", @12: @"Library",
-        @13: @"Sacrifice", @14: @"Devil", @15: @"Angel", @16: @"Dungeon",
-        @17: @"Boss Rush", @18: @"Isaac", @19: @"Barren", @20: @"Chest",
-        @21: @"Dice", @22: @"Black Market", @23: @"Greed Exit", @24: @"Planetarium",
-        @25: @"Teleporter", @26: @"Teleporter Exit", @27: @"Secret Exit",
-        @28: @"Blue", @29: @"Ultra Secret"
+        @1: @"普通房", @2: @"商店", @3: @"错误房", @4: @"宝藏房",
+        @5: @"Boss 房", @6: @"小 Boss 房", @7: @"隐藏房", @8: @"超级隐藏房",
+        @9: @"游戏房", @10: @"诅咒房", @11: @"挑战房", @12: @"图书馆",
+        @13: @"献祭房", @14: @"恶魔房", @15: @"天使房", @16: @"地牢",
+        @17: @"Boss Rush", @18: @"卧室", @19: @"空卧室", @20: @"宝箱房",
+        @21: @"骰子房", @22: @"黑市", @23: @"贪婪模式出口", @24: @"天文馆",
+        @25: @"传送房", @26: @"传送出口", @27: @"隐藏出口",
+        @28: @"蓝房", @29: @"究极隐藏房"
     };
-    return names[@(type)] ?: @"Unknown";
+    return names[@(type)] ?: @"未知";
 }
 
 - (NSString *)itemLabel:(IDCItemRecord *)record {
-    return [NSString stringWithFormat:@"c%ld — %@ (%@)", (long)record.identifier,
-                                      record.name, record.kind];
+    return [NSString stringWithFormat:@"c%ld — %@（%@）", (long)record.identifier,
+                                      record.name, IDCKindLabelZH(record.kind)];
 }
 
 - (NSString *)labelForRecord:(IDCItemRecord *)record prefix:(NSString *)prefix {
@@ -184,16 +196,55 @@ static NSString *const IDCVersion = @"0.4.0";
     return [self.catalog pillEffectsMatching:query limit:limit];
 }
 
+// Display-only prefixes. "c" and "t" are the real ID prefixes and stay as is.
 - (NSString *)prefixForListCommand:(NSString *)command {
     if ([command isEqualToString:@"items"]) return @"c";
     if ([command isEqualToString:@"trinkets"]) return @"t";
-    if ([command isEqualToString:@"cards"]) return @"card ";
-    if ([command isEqualToString:@"runes"]) return @"rune ";
-    return @"effect ";
+    if ([command isEqualToString:@"cards"]) return @"卡牌 ";
+    if ([command isEqualToString:@"runes"]) return @"符文 ";
+    return @"效果 ";
+}
+
+// Chinese text for the error strings returned by IDCNativeBridge. The bridge itself
+// is untouched; unknown strings fall back to the original English text.
+- (NSString *)localizedBridgeError:(NSString *)error {
+    static NSDictionary<NSString *, NSString *> *table;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        table = @{
+            @"The native spawn context is unavailable.": @"原生生成环境不可用。",
+            @"The active Game object is unavailable.": @"无法获取当前的 Game 对象。",
+            @"Isaac's spawn context is not ready in this room.": @"当前房间的生成环境还没有准备好。",
+            @"Isaac's spawn context failed memory validation.": @"生成环境的内存校验失败。",
+            @"Unsupported Isaac executable; mutation disabled.": @"不支持当前的以撒版本，已禁用修改功能。",
+            @"No active player was found.": @"没有找到当前玩家。",
+            @"Wait for the transition or cutscene to finish.": @"请等待过场或动画结束。",
+            @"Pause the run before using modifying commands.": @"请先暂停游戏，再使用会修改游戏的命令。",
+            @"Collectible ID must be between 1 and 732.": @"道具 ID 必须在 1 到 732 之间。",
+            @"Native command signature failed validation; mutation disabled.": @"原生命令的特征校验失败，已禁用修改功能。",
+            @"The native AddCollectible call completed, but inventory verification failed.": @"原生 AddCollectible 调用已完成，但背包校验未通过。",
+            @"The player does not own that collectible.": @"玩家没有这个道具。",
+            @"The native RemoveCollectible call completed, but inventory verification failed.": @"原生 RemoveCollectible 调用已完成，但背包校验未通过。",
+            @"Supported entity types are 2 through 9 and 1000.": @"支持的实体类型为 2 到 9 以及 1000。",
+            @"Entity variant must be between 0 and 9999.": @"实体 variant 必须在 0 到 9999 之间。",
+            @"Entity subtype must be between 0 and 9999.": @"实体 subtype 必须在 0 到 9999 之间。",
+            @"Native spawn signature failed validation; spawning disabled.": @"原生生成函数的特征校验失败，已禁用生成。",
+            @"Isaac rejected the spawn request.": @"游戏拒绝了这次生成请求。",
+            @"The entity was created, but identity verification failed.": @"实体已创建，但身份校验未通过。",
+            @"Pill effect ID must be between 0 and 49.": @"药丸效果 ID 必须在 0 到 49 之间。",
+            @"That pill effect is not present in this run's pill pool.": @"这个药丸效果不在本局的药丸池中。",
+            @"Native active-item signature failed validation; rewind disabled.": @"原生主动道具函数的特征校验失败，已禁用回溯。",
+            @"Restart must run on the game's main thread.": @"重开必须在游戏主线程运行。",
+            @"Native restart signature failed validation.": @"原生重开函数的特征校验失败。",
+            @"Restart is unavailable during menus, transitions or a restricted run.": @"在菜单、过渡动画或受限的游戏中无法重开。",
+            @"The native restart path requires an Eden token.": @"原生重开流程需要伊甸代币。",
+        };
+    });
+    return table[error] ?: error;
 }
 
 - (IDCCommandResult *)nativeResultForError:(NSString *)error success:(NSString *)success {
-    if (error) return [self result:[@"Error: " stringByAppendingString:error]
+    if (error) return [self result:[@"错误：" stringByAppendingString:[self localizedBridgeError:error]]
                               action:IDCCommandActionNone];
     return [self result:success action:IDCCommandActionNone];
 }
@@ -206,7 +257,7 @@ static NSString *const IDCVersion = @"0.4.0";
     NSDictionary<NSString *, id> *definition = [self commandForToken:token];
     if (!definition) {
         return [self result:[NSString stringWithFormat:
-            @"Unknown command ‘%@’. Type help to list commands.", token]
+            @"未知命令“%@”。输入 help 查看全部命令。", token]
                          action:IDCCommandActionNone];
     }
     NSString *command = definition[@"name"];
@@ -214,19 +265,19 @@ static NSString *const IDCVersion = @"0.4.0";
     if ([command isEqualToString:@"help"]) {
         if (argument.length) {
             NSDictionary *target = [self commandForToken:argument];
-            if (!target) return [self result:@"Unknown help topic." action:IDCCommandActionNone];
+            if (!target) return [self result:@"未知的帮助主题。" action:IDCCommandActionNone];
             NSString *aliases = [target[@"aliases"] componentsJoinedByString:@", "];
             NSString *text = [NSString stringWithFormat:@"%@\n%@%@",
                 target[@"usage"], target[@"summary"],
-                aliases.length ? [NSString stringWithFormat:@"\nAliases: %@", aliases] : @""];
+                aliases.length ? [NSString stringWithFormat:@"\n别名：%@", aliases] : @""];
             return [self result:text action:IDCCommandActionNone];
         }
-        NSMutableArray<NSString *> *lines = [NSMutableArray arrayWithObject:@"Available commands:"];
+        NSMutableArray<NSString *> *lines = [NSMutableArray arrayWithObject:@"可用命令："];
         for (NSDictionary *entry in self.commands) {
             [lines addObject:[NSString stringWithFormat:@"  %@ — %@",
                               entry[@"usage"], entry[@"summary"]]];
         }
-        [lines addObject:@"Tap a suggestion to fill it. Native modifying commands require a paused run."];
+        [lines addObject:@"点击联想建议即可自动填入。会修改游戏的命令需要在暂停的游戏中使用。"];
         return [self result:[lines componentsJoinedByString:@"\n"] action:IDCCommandActionNone];
     }
     if ([command isEqualToString:@"clear"]) {
@@ -245,10 +296,10 @@ static NSString *const IDCVersion = @"0.4.0";
 
     IDCNativeSnapshot *snapshot = [self.bridge refreshSnapshot];
     if ([command isEqualToString:@"status"]) {
-        NSString *state = snapshot.inGame ? (snapshot.paused ? @"paused" : @"playing") : @"menu";
+        NSString *state = snapshot.inGame ? (snapshot.paused ? @"已暂停" : @"游戏中") : @"菜单";
         return [self result:[NSString stringWithFormat:
-            @"Bridge: %@\nUUID: %@\nState: %@\nCatalog: %lu items, %lu trinkets, %lu cards/runes, %lu pill effects",
-            snapshot.supportedBuild ? @"supported" : @"disabled", snapshot.executableUUID,
+            @"桥接：%@\nUUID：%@\n状态：%@\n目录：%lu 个道具，%lu 个饰品，%lu 张卡牌/符文，%lu 种药丸效果",
+            snapshot.supportedBuild ? @"已支持" : @"已禁用", snapshot.executableUUID,
             state, (unsigned long)self.catalog.count, (unsigned long)self.catalog.trinketCount,
             (unsigned long)self.catalog.pocketItemCount,
             (unsigned long)self.catalog.pillEffectCount] action:IDCCommandActionNone];
@@ -257,11 +308,11 @@ static NSString *const IDCVersion = @"0.4.0";
     if ([@[@"items", @"trinkets", @"cards", @"runes", @"pilleffects"]
             containsObject:command]) {
         if ([command isEqualToString:@"items"] && !argument.length) {
-            return [self result:@"Usage: items <name|id>" action:IDCCommandActionNone];
+            return [self result:@"用法：items <name|id>" action:IDCCommandActionNone];
         }
         NSArray<IDCItemRecord *> *matches = [self recordsForListCommand:command
                                                                    query:argument limit:30];
-        if (!matches.count) return [self result:@"No matching catalog entries."
+        if (!matches.count) return [self result:@"没有匹配的条目。"
                                                action:IDCCommandActionNone];
         NSString *prefix = [self prefixForListCommand:command];
         NSMutableArray<NSString *> *lines = [NSMutableArray array];
@@ -272,35 +323,35 @@ static NSString *const IDCVersion = @"0.4.0";
     }
 
     if (!snapshot.inGame) {
-        return [self result:@"This command requires an active run." action:IDCCommandActionNone];
+        return [self result:@"该命令需要在进行中的游戏里使用。" action:IDCCommandActionNone];
     }
     if ([command isEqualToString:@"seed"]) {
         return [self result:snapshot.runSeed
-            ? [NSString stringWithFormat:@"Run seed: %u (0x%08X)",
+            ? [NSString stringWithFormat:@"本局种子：%u (0x%08X)",
                snapshot.runSeed, snapshot.runSeed]
-            : @"Run seed is unavailable." action:IDCCommandActionNone];
+            : @"无法获取种子。" action:IDCCommandActionNone];
     }
     if ([command isEqualToString:@"room"]) {
         return [self result:snapshot.roomType
-            ? [NSString stringWithFormat:@"Room type: %ld — %@", (long)snapshot.roomType,
+            ? [NSString stringWithFormat:@"房间类型：%ld — %@", (long)snapshot.roomType,
                [self roomName:snapshot.roomType]]
-            : @"Room type is unavailable." action:IDCCommandActionNone];
+            : @"无法获取房间类型。" action:IDCCommandActionNone];
     }
     if ([command isEqualToString:@"position"]) {
-        return [self result:[NSString stringWithFormat:@"Player %ld position: %.2f, %.2f",
+        return [self result:[NSString stringWithFormat:@"玩家类型 %ld，坐标：%.2f, %.2f",
             (long)snapshot.playerType, snapshot.playerX, snapshot.playerY]
                          action:IDCCommandActionNone];
     }
     if ([command isEqualToString:@"inventory"]) {
         if (!snapshot.collectibleCounts.count) {
-            return [self result:@"No owned collectibles found." action:IDCCommandActionNone];
+            return [self result:@"没有找到已拥有的道具。" action:IDCCommandActionNone];
         }
         NSArray<NSNumber *> *identifiers = [snapshot.collectibleCounts.allKeys
             sortedArrayUsingSelector:@selector(compare:)];
         NSMutableArray<NSString *> *values = [NSMutableArray array];
         for (NSNumber *identifier in identifiers) {
             IDCItemRecord *record = [self.catalog recordForIdentifier:identifier.integerValue];
-            NSString *name = record.name ?: [NSString stringWithFormat:@"Collectible %@", identifier];
+            NSString *name = record.name ?: [NSString stringWithFormat:@"道具 %@", identifier];
             [values addObject:[NSString stringWithFormat:@"c%@ %@ ×%@", identifier, name,
                                snapshot.collectibleCounts[identifier]]];
         }
@@ -313,7 +364,7 @@ static NSString *const IDCVersion = @"0.4.0";
         NSString *nativeError = [command isEqualToString:@"giveitem"]
             ? [self.bridge giveCollectible:record.identifier]
             : [self.bridge removeCollectible:record.identifier];
-        NSString *verb = [command isEqualToString:@"giveitem"] ? @"Added" : @"Removed";
+        NSString *verb = [command isEqualToString:@"giveitem"] ? @"已添加" : @"已移除";
         return [self nativeResultForError:nativeError success:[NSString stringWithFormat:
             @"%@ c%ld — %@", verb, (long)record.identifier, record.name]];
     }
@@ -321,7 +372,7 @@ static NSString *const IDCVersion = @"0.4.0";
         NSUInteger componentCount = [command isEqualToString:@"spawn"] ? 3 : 2;
         NSArray<NSNumber *> *values = nil;
         if (![self parseUnsignedComponents:argument count:componentCount values:&values]) {
-            return [self result:[NSString stringWithFormat:@"Usage: %@", definition[@"usage"]]
+            return [self result:[NSString stringWithFormat:@"用法：%@", definition[@"usage"]]
                              action:IDCCommandActionNone];
         }
         NSInteger type = [command isEqualToString:@"spawn"] ? values[0].integerValue : 5;
@@ -330,7 +381,7 @@ static NSString *const IDCVersion = @"0.4.0";
         NSInteger subtype = values[(NSUInteger)index + 1].integerValue;
         NSString *error = [self.bridge spawnEntityType:type variant:variant subtype:subtype];
         return [self nativeResultForError:error success:[NSString stringWithFormat:
-            @"Spawned %ld.%ld.%ld beside the player.", (long)type, (long)variant,
+            @"已在玩家旁边生成 %ld.%ld.%ld。", (long)type, (long)variant,
             (long)subtype]];
     }
     if ([command isEqualToString:@"spawnitem"]) {
@@ -339,7 +390,7 @@ static NSString *const IDCVersion = @"0.4.0";
         if (!record) return [self result:lookupError action:IDCCommandActionNone];
         NSString *error = [self.bridge spawnEntityType:5 variant:100 subtype:record.identifier];
         return [self nativeResultForError:error success:[NSString stringWithFormat:
-            @"Spawned collectible c%ld — %@.", (long)record.identifier, record.name]];
+            @"已生成道具 c%ld — %@。", (long)record.identifier, record.name]];
     }
     if ([command isEqualToString:@"spawntrinket"]) {
         NSString *lookupError = nil;
@@ -347,7 +398,7 @@ static NSString *const IDCVersion = @"0.4.0";
         if (!record) return [self result:lookupError action:IDCCommandActionNone];
         NSString *error = [self.bridge spawnEntityType:5 variant:350 subtype:record.identifier];
         return [self nativeResultForError:error success:[NSString stringWithFormat:
-            @"Spawned trinket t%ld — %@.", (long)record.identifier, record.name]];
+            @"已生成饰品 t%ld — %@。", (long)record.identifier, record.name]];
     }
     if ([command isEqualToString:@"spawncard"] || [command isEqualToString:@"spawnrune"]) {
         BOOL rune = [command isEqualToString:@"spawnrune"];
@@ -366,7 +417,7 @@ static NSString *const IDCVersion = @"0.4.0";
         if (!record) return [self result:lookupError action:IDCCommandActionNone];
         NSString *error = [self.bridge spawnEntityType:5 variant:300 subtype:record.identifier];
         return [self nativeResultForError:error success:[NSString stringWithFormat:
-            @"Spawned %@ %ld — %@.", rune ? @"rune" : @"card",
+            @"已生成%@ %ld — %@。", rune ? @"符文" : @"卡牌",
             (long)record.identifier, record.name]];
     }
     if ([command isEqualToString:@"spawnpill"]) {
@@ -389,16 +440,17 @@ static NSString *const IDCVersion = @"0.4.0";
         query = [query stringByReplacingOccurrencesOfString:@"\"" withString:@""];
         BOOL numeric = query.length && [query rangeOfCharacterFromSet:
             NSCharacterSet.decimalDigitCharacterSet.invertedSet].location == NSNotFound;
+        NSString *pillName = horse ? @"大药丸" : @"药丸";
         if (numeric && !explicitEffect) {
             NSInteger color = query.integerValue;
             if (color < 1 || color > 14) {
-                return [self result:@"Pill color must be between 1 and 14. Use ‘effect <id>’ for an effect ID."
+                return [self result:@"药丸颜色必须在 1 到 14 之间。指定效果 ID 请用 ‘effect <id>’。"
                                  action:IDCCommandActionNone];
             }
             NSInteger subtype = color | (horse ? (1 << 11) : 0);
             NSString *error = [self.bridge spawnEntityType:5 variant:70 subtype:subtype];
             return [self nativeResultForError:error success:[NSString stringWithFormat:
-                @"Spawned %@pill color %ld.", horse ? @"horse " : @"", (long)color]];
+                @"已生成%@，颜色 %ld。", pillName, (long)color]];
         }
         NSString *lookupError = nil;
         IDCItemRecord *effect = [self.catalog pillEffectForSpecifier:query error:&lookupError];
@@ -407,21 +459,19 @@ static NSString *const IDCVersion = @"0.4.0";
         NSString *error = [self.bridge spawnPillEffect:effect.identifier horse:horse
                                          resolvedColor:&color];
         return [self nativeResultForError:error success:[NSString stringWithFormat:
-            @"Spawned %@pill color %ld — %@.", horse ? @"horse " : @"", (long)color,
-            effect.name]];
+            @"已生成%@，颜色 %ld — %@。", pillName, (long)color, effect.name]];
     }
     if ([command isEqualToString:@"rewind"]) {
         NSString *error = [self.bridge rewind];
-        return [self nativeResultForError:error
-                                  success:@"Rewind triggered through Glowing Hourglass logic."];
+        return [self nativeResultForError:error success:@"已通过发光沙漏的逻辑触发回溯。"];
     }
     if ([command isEqualToString:@"restart"]) {
-        if (argument.length) return [self result:@"Usage: restart (alias: rs)" action:IDCCommandActionNone];
+        if (argument.length) return [self result:@"用法：restart（别名：rs）" action:IDCCommandActionNone];
         NSString *error = [self.bridge restart];
         if (error) return [self nativeResultForError:error success:@""];
-        return [self result:@"Native fresh-run restart queued." action:IDCCommandActionClose];
+        return [self result:@"已排队执行新一局重开。" action:IDCCommandActionClose];
     }
-    return [self result:@"Command is not implemented." action:IDCCommandActionNone];
+    return [self result:@"该命令尚未实现。" action:IDCCommandActionNone];
 }
 
 - (IDCCommandSuggestion *)suggestion:(NSString *)display replacement:(NSString *)replacement {
@@ -490,7 +540,7 @@ static NSString *const IDCVersion = @"0.4.0";
             [command isEqualToString:@"spawnrune"];
         [self addRecordSuggestions:[self.catalog pocketItemsMatching:argument
                                      kind:rune ? @"rune" : @"card" limit:limit]
-                           command:command prefix:rune ? @"rune " : @"card " to:suggestions];
+                           command:command prefix:rune ? @"符文 " : @"卡牌 " to:suggestions];
     } else if ([command isEqualToString:@"pilleffects"] ||
                [command isEqualToString:@"spawnpill"]) {
         NSString *query = argument;
@@ -500,18 +550,18 @@ static NSString *const IDCVersion = @"0.4.0";
             NSString *replacement = [command isEqualToString:@"spawnpill"]
                 ? [NSString stringWithFormat:@"spawnpill effect %ld", (long)record.identifier]
                 : [NSString stringWithFormat:@"pilleffects %ld", (long)record.identifier];
-            [suggestions addObject:[self suggestion:[self labelForRecord:record prefix:@"effect "]
+            [suggestions addObject:[self suggestion:[self labelForRecord:record prefix:@"效果 "]
                 replacement:replacement]];
         }
         if ([command isEqualToString:@"spawnpill"] && !argument.length) {
-            [suggestions insertObject:[self suggestion:@"spawnpill <color 1-14> [horse]"
+            [suggestions insertObject:[self suggestion:@"spawnpill <color 1-14> [horse]（颜色 1-14，可选 horse 表示大药丸）"
                 replacement:@"spawnpill 1"] atIndex:0];
         }
     } else if ([command isEqualToString:@"spawn"]) {
-        [suggestions addObject:[self suggestion:@"type.variant.subtype (example: pickup collectible 1)"
+        [suggestions addObject:[self suggestion:@"type.variant.subtype（示例：5.100.1 = 拾取物 · 道具 · 1）"
             replacement:@"spawn 5.100.1"]];
     } else if ([command isEqualToString:@"spawnpickup"]) {
-        [suggestions addObject:[self suggestion:@"variant.subtype (example: collectible 1)"
+        [suggestions addObject:[self suggestion:@"variant.subtype（示例：100.1 = 道具 1）"
             replacement:@"spawnpickup 100.1"]];
     } else if ([command isEqualToString:@"help"]) {
         for (NSDictionary<NSString *, id> *entry in self.commands) {
