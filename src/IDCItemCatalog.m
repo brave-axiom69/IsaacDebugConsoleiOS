@@ -1,7 +1,36 @@
 #import "IDCItemCatalog.h"
 #import "IDCLogger.h"
+#import "IDCNamesZH.h"
+
+static NSArray<NSString *> *IDCResourceRoots(void) {
+    return @[@"repentance-resources", @"afterbirthplus-resources",
+             @"afterbirth-resources", @"rebirth-resources"];
+}
+
+// Lowercase, keep only a-z and 0-9, so "Mom's Knife" == "MomsKnife".
+static NSString *IDCNormalizedKey(NSString *name) {
+    NSString *lower = name.lowercaseString;
+    NSMutableString *out = [NSMutableString stringWithCapacity:lower.length];
+    for (NSUInteger i = 0; i < lower.length; ++i) {
+        unichar c = [lower characterAtIndex:i];
+        if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) [out appendFormat:@"%C", c];
+    }
+    return out;
+}
+
+// Display-only Chinese label for the English category words used in lookups.
+static NSString *IDCLabelZH(NSString *label) {
+    NSDictionary<NSString *, NSString *> *labels = @{
+        @"trinket": @"饰品", @"card": @"卡牌", @"rune": @"符文",
+        @"pill effect": @"药丸效果", @"card/rune": @"卡牌/符文"
+    };
+    return labels[label] ?: label;
+}
 
 @implementation IDCItemRecord
+- (NSString *)displayName {
+    return self.nameZH.length ? self.nameZH : self.name;
+}
 @end
 
 @interface IDCItemCatalog () <NSXMLParserDelegate>
@@ -14,6 +43,11 @@
 @property(nonatomic, strong) NSMutableDictionary<NSNumber *, IDCItemRecord *> *pillEffectsByID;
 @property(nonatomic, copy) NSArray<IDCItemRecord *> *sortedPillEffects;
 @property(nonatomic) BOOL parsingPocketItems;
+@property(nonatomic, copy) NSDictionary<NSString *, NSString *> *zhNames;
+@property(nonatomic, strong) NSCache<NSString *, UIImage *> *iconCache;
+@property(nonatomic, copy) NSString *collectibleIconDir;
+@property(nonatomic, copy) NSString *trinketIconDir;
+@property(nonatomic) BOOL iconDirsResolved;
 @end
 
 @implementation IDCItemCatalog
@@ -25,6 +59,8 @@
         _trinketsByID = [NSMutableDictionary dictionary];
         _pocketItemsByID = [NSMutableDictionary dictionary];
         _pillEffectsByID = [NSMutableDictionary dictionary];
+        _iconCache = [NSCache new];
+        [self loadChineseNames];
         [self loadCatalog];
     }
     return self;
@@ -38,10 +74,44 @@
 - (NSUInteger)pocketItemCount { return self.sortedPocketItems.count; }
 - (NSUInteger)pillEffectCount { return self.sortedPillEffects.count; }
 
+- (NSArray<IDCItemRecord *> *)collectibleRecords { return self.sortedRecords ?: @[]; }
+- (NSArray<IDCItemRecord *> *)trinketRecords { return self.sortedTrinkets ?: @[]; }
+- (NSArray<IDCItemRecord *> *)pillRecords { return self.sortedPillEffects ?: @[]; }
+- (NSArray<IDCItemRecord *> *)pocketRecordsOfKind:(NSString *)kind {
+    NSMutableArray<IDCItemRecord *> *result = [NSMutableArray array];
+    for (IDCItemRecord *record in self.sortedPocketItems) {
+        if ([record.kind isEqualToString:kind]) [result addObject:record];
+    }
+    return result;
+}
+
+#pragma mark - Chinese names
+
+- (void)loadChineseNames {
+    NSMutableDictionary<NSString *, NSString *> *table = [NSMutableDictionary dictionary];
+    [IDCZHNamesBlob enumerateLinesUsingBlock:^(NSString *line, BOOL *stop) {
+        (void)stop;
+        NSRange bar = [line rangeOfString:@"|"];
+        if (bar.location == NSNotFound) return;
+        NSString *english = [line substringToIndex:bar.location];
+        NSString *chinese = [[line substringFromIndex:bar.location + 1]
+            stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+        NSString *key = IDCNormalizedKey(english);
+        if (key.length && chinese.length) table[key] = chinese;
+    }];
+    self.zhNames = table;
+}
+
+- (void)applyChineseNames:(NSArray<IDCItemRecord *> *)records {
+    for (IDCItemRecord *record in records) {
+        record.nameZH = self.zhNames[IDCNormalizedKey(record.name)];
+    }
+}
+
+#pragma mark - XML paths
+
 - (NSString *)itemsXMLPath {
-    NSArray<NSString *> *roots = @[@"repentance-resources", @"afterbirthplus-resources",
-                                    @"afterbirth-resources", @"rebirth-resources"];
-    for (NSString *root in roots) {
+    for (NSString *root in IDCResourceRoots()) {
         NSString *path = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:
             [NSString stringWithFormat:@"%@/data/items.xml", root]];
         if ([[NSFileManager defaultManager] isReadableFileAtPath:path]) return path;
@@ -50,9 +120,7 @@
 }
 
 - (NSString *)pocketItemsXMLPath {
-    NSArray<NSString *> *roots = @[@"repentance-resources", @"afterbirthplus-resources",
-                                    @"afterbirth-resources", @"rebirth-resources"];
-    for (NSString *root in roots) {
+    for (NSString *root in IDCResourceRoots()) {
         NSString *path = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:
             [NSString stringWithFormat:@"%@/data/pocketitems.xml", root]];
         if ([[NSFileManager defaultManager] isReadableFileAtPath:path]) return path;
@@ -123,6 +191,9 @@
         sortedArrayUsingComparator:byIdentifier];
     self.sortedPillEffects = [[self.pillEffectsByID allValues]
         sortedArrayUsingComparator:byIdentifier];
+    // The table only covers collectibles; trinkets/cards/pills keep their English
+    // names (some share names with collectibles, e.g. the "Cancer" trinket).
+    [self applyChineseNames:self.sortedRecords];
     IDCLog(@"catalog loaded: %lu collectibles, %lu trinkets, %lu cards/runes, %lu pill effects",
            (unsigned long)self.sortedRecords.count, (unsigned long)self.sortedTrinkets.count,
            (unsigned long)self.sortedPocketItems.count,
@@ -167,12 +238,70 @@
     record.identifier = identifier;
     record.name = [self displayNameFromAttributes:attributes identifier:identifier];
     record.kind = elementName;
+    NSString *gfx = [attributes[@"gfx"] lastPathComponent];
+    record.gfx = gfx.length ? gfx : nil;
     if ([elementName isEqualToString:@"trinket"]) {
         self.trinketsByID[@(identifier)] = record;
     } else {
         self.recordsByID[@(identifier)] = record;
     }
 }
+
+#pragma mark - Icons (read from the installed game at runtime)
+
+- (NSString *)findItemsSubdirectory:(NSString *)leaf {
+    NSFileManager *manager = NSFileManager.defaultManager;
+    NSString *bundle = NSBundle.mainBundle.bundlePath;
+    for (NSString *root in IDCResourceRoots()) {
+        for (NSString *prefix in @[@"gfx", @"resources/gfx"]) {
+            NSString *candidate = [bundle stringByAppendingPathComponent:
+                [NSString stringWithFormat:@"%@/%@/items/%@", root, prefix, leaf]];
+            BOOL isDirectory = NO;
+            if ([manager fileExistsAtPath:candidate isDirectory:&isDirectory] && isDirectory) {
+                return candidate;
+            }
+        }
+    }
+    // Fallback: one bounded scan of the app bundle.
+    NSString *suffix = [NSString stringWithFormat:@"gfx/items/%@", leaf];
+    NSDirectoryEnumerator *enumerator = [manager enumeratorAtPath:bundle];
+    for (NSString *relative in enumerator) {
+        if (enumerator.level > 6) { [enumerator skipDescendants]; continue; }
+        if ([relative hasSuffix:suffix] &&
+            [enumerator.fileAttributes[NSFileType] isEqual:NSFileTypeDirectory]) {
+            return [bundle stringByAppendingPathComponent:relative];
+        }
+    }
+    return nil;
+}
+
+- (void)resolveIconDirectories {
+    if (self.iconDirsResolved) return;
+    self.iconDirsResolved = YES;
+    self.collectibleIconDir = [self findItemsSubdirectory:@"collectibles"];
+    self.trinketIconDir = [self findItemsSubdirectory:@"trinkets"];
+    IDCLog(@"icon dirs: collectibles=%@ trinkets=%@",
+           self.collectibleIconDir ?: @"(not found)", self.trinketIconDir ?: @"(not found)");
+}
+
+- (UIImage *)iconForRecord:(IDCItemRecord *)record {
+    if (!record.gfx.length) return nil;
+    BOOL trinket = [record.kind isEqualToString:@"trinket"];
+    BOOL collectible = [@[@"passive", @"active", @"familiar"] containsObject:record.kind];
+    if (!trinket && !collectible) return nil;
+    NSString *cacheKey = [NSString stringWithFormat:@"%@/%@", record.kind, record.gfx];
+    UIImage *cached = [self.iconCache objectForKey:cacheKey];
+    if (cached) return cached;
+    [self resolveIconDirectories];
+    NSString *directory = trinket ? self.trinketIconDir : self.collectibleIconDir;
+    if (!directory.length) return nil;
+    UIImage *image = [UIImage imageWithContentsOfFile:
+        [directory stringByAppendingPathComponent:record.gfx]];
+    if (image) [self.iconCache setObject:image forKey:cacheKey];
+    return image;
+}
+
+#pragma mark - Lookup
 
 - (IDCItemRecord *)recordForIdentifier:(NSInteger)identifier {
     return self.recordsByID[@(identifier)];
@@ -182,7 +311,7 @@
     NSString *trimmed = [specifier stringByTrimmingCharactersInSet:
         NSCharacterSet.whitespaceAndNewlineCharacterSet];
     if (!trimmed.length) {
-        if (error) *error = @"Missing collectible ID or name.";
+        if (error) *error = @"缺少道具 ID 或名称。";
         return nil;
     }
     NSString *numeric = trimmed;
@@ -199,11 +328,11 @@
             if (known) return known;
             IDCItemRecord *fallback = [IDCItemRecord new];
             fallback.identifier = identifier;
-            fallback.name = [NSString stringWithFormat:@"Collectible %ld", (long)identifier];
+            fallback.name = [NSString stringWithFormat:@"道具 %ld", (long)identifier];
             fallback.kind = @"unknown";
             return fallback;
         }
-        if (error) *error = @"Collectible ID must be between 1 and 732.";
+        if (error) *error = @"道具 ID 必须在 1 到 732 之间。";
         return nil;
     }
 
@@ -218,14 +347,14 @@
     if (matches.count == 1) return matches.firstObject;
     if (error) {
         if (!matches.count) {
-            *error = [NSString stringWithFormat:@"No collectible matches ‘%@’.", trimmed];
+            *error = [NSString stringWithFormat:@"没有匹配“%@”的道具。", trimmed];
         } else {
             NSMutableArray<NSString *> *names = [NSMutableArray array];
             for (IDCItemRecord *record in matches) {
                 [names addObject:[NSString stringWithFormat:@"c%ld %@",
                                   (long)record.identifier, record.name]];
             }
-            *error = [NSString stringWithFormat:@"Ambiguous item: %@",
+            *error = [NSString stringWithFormat:@"名称不明确，可能是：%@",
                       [names componentsJoinedByString:@", "]];
         }
     }
@@ -282,7 +411,7 @@
     NSString *trimmed = [specifier stringByTrimmingCharactersInSet:
         NSCharacterSet.whitespaceAndNewlineCharacterSet];
     if (!trimmed.length) {
-        if (error) *error = [NSString stringWithFormat:@"Missing %@ ID or name.", label];
+        if (error) *error = [NSString stringWithFormat:@"缺少%@的 ID 或名称。", IDCLabelZH(label)];
         return nil;
     }
     NSString *numeric = trimmed;
@@ -296,16 +425,16 @@
             .location == NSNotFound && numeric.length) {
         NSInteger identifier = numeric.integerValue;
         if (identifier < minimumID || identifier > maximumID) {
-            if (error) *error = [NSString stringWithFormat:@"%@ ID must be between %ld and %ld.",
-                label.capitalizedString, (long)minimumID, (long)maximumID];
+            if (error) *error = [NSString stringWithFormat:@"%@ ID 必须在 %ld 到 %ld 之间。",
+                IDCLabelZH(label), (long)minimumID, (long)maximumID];
             return nil;
         }
         for (IDCItemRecord *record in records) {
             if (record.identifier == identifier &&
                 (!kind.length || [record.kind isEqualToString:kind])) return record;
         }
-        if (error) *error = [NSString stringWithFormat:@"Unknown %@ ID %ld.",
-            label, (long)identifier];
+        if (error) *error = [NSString stringWithFormat:@"未知的%@ ID %ld。",
+            IDCLabelZH(label), (long)identifier];
         return nil;
     }
     NSArray<IDCItemRecord *> *matches = [self recordsMatching:trimmed records:records
@@ -319,14 +448,14 @@
     if (matches.count == 1) return matches.firstObject;
     if (error) {
         if (!matches.count) {
-            *error = [NSString stringWithFormat:@"No %@ matches ‘%@’.", label, trimmed];
+            *error = [NSString stringWithFormat:@"没有匹配“%@”的%@。", trimmed, IDCLabelZH(label)];
         } else {
             NSMutableArray<NSString *> *values = [NSMutableArray array];
             for (IDCItemRecord *record in matches) {
                 [values addObject:[NSString stringWithFormat:@"%ld %@",
                     (long)record.identifier, record.name]];
             }
-            *error = [NSString stringWithFormat:@"Ambiguous %@: %@", label,
+            *error = [NSString stringWithFormat:@"%@名称不明确，可能是：%@", IDCLabelZH(label),
                 [values componentsJoinedByString:@", "]];
         }
     }
