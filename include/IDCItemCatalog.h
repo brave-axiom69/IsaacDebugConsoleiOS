@@ -1,4 +1,5 @@
 #import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -6,6 +7,12 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic) NSInteger identifier;
 @property(nonatomic, copy) NSString *name;
 @property(nonatomic, copy) NSString *kind;
+// Icon file name from items.xml (e.g. Collectibles_001_TheSadOnion.png).
+@property(nonatomic, copy, nullable) NSString *gfx;
+// Chinese name, if the translation table has one.
+@property(nonatomic, copy, nullable) NSString *nameZH;
+// Chinese name when available, otherwise the English name.
+@property(nonatomic, readonly) NSString *displayName;
 @end
 
 @interface IDCItemCatalog : NSObject
@@ -33,6 +40,15 @@ NS_ASSUME_NONNULL_BEGIN
 - (nullable IDCItemRecord *)pillEffectForSpecifier:(NSString *)specifier
                                               error:(NSString * _Nullable * _Nullable)error;
 - (NSArray<IDCItemRecord *> *)pillEffectsMatching:(NSString *)query limit:(NSUInteger)limit;
+
+// Full lists, sorted by ID, for the icon grid.
+- (NSArray<IDCItemRecord *> *)collectibleRecords;
+- (NSArray<IDCItemRecord *> *)trinketRecords;
+- (NSArray<IDCItemRecord *> *)pocketRecordsOfKind:(NSString *)kind; // @"card" or @"rune"
+- (NSArray<IDCItemRecord *> *)pillRecords;
+
+// Icon read at runtime from the installed game. nil if not found.
+- (nullable UIImage *)iconForRecord:(IDCItemRecord *)record;
 @end
 
 NS_ASSUME_NONNULL_END
