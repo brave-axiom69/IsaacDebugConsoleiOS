@@ -1,5 +1,12 @@
+
 #import <Foundation/Foundation.h>
+
+#if __has_include(<UIKit/UIKit.h>)
 #import <UIKit/UIKit.h>
+#define IDC_ITEM_CATALOG_HAS_UIKIT 1
+#else
+#define IDC_ITEM_CATALOG_HAS_UIKIT 0
+#endif
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -47,8 +54,11 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSArray<IDCItemRecord *> *)pocketRecordsOfKind:(NSString *)kind; // @"card" or @"rune"
 - (NSArray<IDCItemRecord *> *)pillRecords;
 
+#if IDC_ITEM_CATALOG_HAS_UIKIT
 // Icon read at runtime from the installed game. nil if not found.
 - (nullable UIImage *)iconForRecord:(IDCItemRecord *)record;
+#endif
+
 @end
 
 NS_ASSUME_NONNULL_END
