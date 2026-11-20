@@ -1,10 +1,10 @@
+
 #import "IDCCommandEngine.h"
 #import "IDCItemCatalog.h"
 #import "IDCNativeBridge.h"
 
 static NSString *const IDCVersion = @"0.4.0";
 
-// Display-only Chinese label for a record kind (the command IDs stay English).
 static NSString *IDCKindLabelZH(NSString *kind) {
     NSDictionary<NSString *, NSString *> *labels = @{
         @"passive": @"被动", @"active": @"主动", @"familiar": @"跟班",
@@ -33,8 +33,7 @@ static NSString *IDCKindLabelZH(NSString *kind) {
     if (self) {
         _bridge = bridge;
         _catalog = catalog;
-        // "name", "aliases" and "usage" are the real commands and stay English.
-        // Only "summary" is shown to the player, so it is in Chinese.
+
         _commands = @[
             @{ @"name": @"help", @"aliases": @[@"?"], @"usage": @"help [command]",
                @"summary": @"显示全部命令，或某个命令的详细说明" },
@@ -87,7 +86,7 @@ static NSString *IDCKindLabelZH(NSString *kind) {
                @"usage": @"spawnpill <color|effect> [horse]",
                @"summary": @"从本局药丸池中生成一颗药丸" },
             @{ @"name": @"rewind", @"aliases": @[@"hourglass"], @"usage": @"rewind",
-               @"summary": @"通过发光沙漏的逻辑回溯" },
+               @"summary": @"通过发光沙漏（Glowing Hourglass）的逻辑回溯" },
             @{ @"name": @"restart", @"aliases": @[@"rs"], @"usage": @"restart",
                @"summary": @"用相同角色和难度开始新的一局（别名：rs）" },
             @{ @"name": @"history", @"aliases": @[], @"usage": @"history",
@@ -114,7 +113,9 @@ static NSString *IDCKindLabelZH(NSString *kind) {
     NSString *needle = token.lowercaseString;
     for (NSDictionary<NSString *, id> *command in self.commands) {
         if ([command[@"name"] isEqualToString:needle] ||
-            [command[@"aliases"] containsObject:needle]) return command;
+            [command[@"aliases"] containsObject:needle]) {
+            return command;
+        }
     }
     return nil;
 }
@@ -123,13 +124,19 @@ static NSString *IDCKindLabelZH(NSString *kind) {
     NSString *trimmed = [input stringByTrimmingCharactersInSet:
         NSCharacterSet.whitespaceAndNewlineCharacterSet];
     NSRange whitespace = [trimmed rangeOfCharacterFromSet:NSCharacterSet.whitespaceCharacterSet];
-    if (whitespace.location == NSNotFound) return @[trimmed.lowercaseString, @""];
+
+    if (whitespace.location == NSNotFound) {
+        return @[trimmed.lowercaseString, @""];
+    }
+
     NSString *command = [[trimmed substringToIndex:whitespace.location] lowercaseString];
     NSString *argument = [[trimmed substringFromIndex:NSMaxRange(whitespace)]
         stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+
     if ([argument hasPrefix:@"\""] && [argument hasSuffix:@"\""] && argument.length >= 2) {
         argument = [argument substringWithRange:NSMakeRange(1, argument.length - 2)];
     }
+
     return @[command, argument];
 }
 
@@ -148,13 +155,13 @@ static NSString *IDCKindLabelZH(NSString *kind) {
 }
 
 - (NSString *)itemLabel:(IDCItemRecord *)record {
-    return [NSString stringWithFormat:@"c%ld — %@（%@）", (long)record.identifier,
-                                      record.name, IDCKindLabelZH(record.kind)];
+    return [NSString stringWithFormat:@"c%ld — %@（%@）",
+            (long)record.identifier, record.name, IDCKindLabelZH(record.kind)];
 }
 
 - (NSString *)labelForRecord:(IDCItemRecord *)record prefix:(NSString *)prefix {
-    return [NSString stringWithFormat:@"%@%ld — %@", prefix, (long)record.identifier,
-                                      record.name];
+    return [NSString stringWithFormat:@"%@%ld — %@",
+            prefix, (long)record.identifier, record.name];
 }
 
 - (BOOL)parseUnsignedComponents:(NSString *)argument
@@ -162,11 +169,14 @@ static NSString *IDCKindLabelZH(NSString *kind) {
                          values:(NSArray<NSNumber *> * _Nullable * _Nullable)values {
     NSString *normalized = argument;
     for (NSString *separator in @[@".", @":", @","]) {
-        normalized = [normalized stringByReplacingOccurrencesOfString:separator withString:@" "];
+        normalized = [normalized stringByReplacingOccurrencesOfString:separator
+                                                           withString:@" "];
     }
+
     NSArray<NSString *> *raw = [normalized componentsSeparatedByCharactersInSet:
         NSCharacterSet.whitespaceAndNewlineCharacterSet];
     NSMutableArray<NSNumber *> *parsed = [NSMutableArray array];
+
     for (NSString *component in raw) {
         if (!component.length) continue;
         if ([component rangeOfCharacterFromSet:
@@ -175,6 +185,7 @@ static NSString *IDCKindLabelZH(NSString *kind) {
         }
         [parsed addObject:@(component.integerValue)];
     }
+
     if (parsed.count != expectedCount) return NO;
     if (values) *values = parsed.copy;
     return YES;
@@ -196,7 +207,6 @@ static NSString *IDCKindLabelZH(NSString *kind) {
     return [self.catalog pillEffectsMatching:query limit:limit];
 }
 
-// Display-only prefixes. "c" and "t" are the real ID prefixes and stay as is.
 - (NSString *)prefixForListCommand:(NSString *)command {
     if ([command isEqualToString:@"items"]) return @"c";
     if ([command isEqualToString:@"trinkets"]) return @"t";
@@ -205,8 +215,6 @@ static NSString *IDCKindLabelZH(NSString *kind) {
     return @"效果 ";
 }
 
-// Chinese text for the error strings returned by IDCNativeBridge. The bridge itself
-// is untouched; unknown strings fall back to the original English text.
 - (NSString *)localizedBridgeError:(NSString *)error {
     static NSDictionary<NSString *, NSString *> *table;
     static dispatch_once_t once;
@@ -244,8 +252,11 @@ static NSString *IDCKindLabelZH(NSString *kind) {
 }
 
 - (IDCCommandResult *)nativeResultForError:(NSString *)error success:(NSString *)success {
-    if (error) return [self result:[@"错误：" stringByAppendingString:[self localizedBridgeError:error]]
-                              action:IDCCommandActionNone];
+    if (error) {
+        return [self result:[NSString stringWithFormat:@"Error: %@",
+                             [self localizedBridgeError:error]]
+                     action:IDCCommandActionNone];
+    }
     return [self result:success action:IDCCommandActionNone];
 }
 
@@ -253,33 +264,47 @@ static NSString *IDCKindLabelZH(NSString *kind) {
     NSArray<NSString *> *parts = [self commandAndArgument:input];
     NSString *token = parts[0];
     NSString *argument = parts[1];
-    if (!token.length) return [self result:@"" action:IDCCommandActionNone];
+
+    if (!token.length) {
+        return [self result:@"" action:IDCCommandActionNone];
+    }
+
     NSDictionary<NSString *, id> *definition = [self commandForToken:token];
     if (!definition) {
         return [self result:[NSString stringWithFormat:
             @"未知命令“%@”。输入 help 查看全部命令。", token]
-                         action:IDCCommandActionNone];
+                     action:IDCCommandActionNone];
     }
+
     NSString *command = definition[@"name"];
 
     if ([command isEqualToString:@"help"]) {
         if (argument.length) {
             NSDictionary *target = [self commandForToken:argument];
-            if (!target) return [self result:@"未知的帮助主题。" action:IDCCommandActionNone];
+            if (!target) {
+                return [self result:@"未知的帮助主题。" action:IDCCommandActionNone];
+            }
+
             NSString *aliases = [target[@"aliases"] componentsJoinedByString:@", "];
             NSString *text = [NSString stringWithFormat:@"%@\n%@%@",
                 target[@"usage"], target[@"summary"],
-                aliases.length ? [NSString stringWithFormat:@"\n别名：%@", aliases] : @""];
+                aliases.length
+                    ? [NSString stringWithFormat:@"\n别名：%@\nAliases: %@", aliases, aliases]
+                    : @""];
+
             return [self result:text action:IDCCommandActionNone];
         }
+
         NSMutableArray<NSString *> *lines = [NSMutableArray arrayWithObject:@"可用命令："];
         for (NSDictionary *entry in self.commands) {
             [lines addObject:[NSString stringWithFormat:@"  %@ — %@",
                               entry[@"usage"], entry[@"summary"]]];
         }
         [lines addObject:@"点击联想建议即可自动填入。会修改游戏的命令需要在暂停的游戏中使用。"];
-        return [self result:[lines componentsJoinedByString:@"\n"] action:IDCCommandActionNone];
+        return [self result:[lines componentsJoinedByString:@"\n"]
+                     action:IDCCommandActionNone];
     }
+
     if ([command isEqualToString:@"clear"]) {
         return [self result:@"" action:IDCCommandActionClear];
     }
@@ -290,11 +315,13 @@ static NSString *IDCKindLabelZH(NSString *kind) {
         return [self result:@"" action:IDCCommandActionHistory];
     }
     if ([command isEqualToString:@"version"]) {
-        return [self result:[NSString stringWithFormat:@"Isaac Debug Console iOS %@", IDCVersion]
-                         action:IDCCommandActionNone];
+        return [self result:[NSString stringWithFormat:
+            @"Isaac Debug Console iOS %@", IDCVersion]
+                     action:IDCCommandActionNone];
     }
 
     IDCNativeSnapshot *snapshot = [self.bridge refreshSnapshot];
+
     if ([command isEqualToString:@"status"]) {
         NSString *state = snapshot.inGame ? (snapshot.paused ? @"已暂停" : @"游戏中") : @"菜单";
         return [self result:[NSString stringWithFormat:
@@ -302,7 +329,8 @@ static NSString *IDCKindLabelZH(NSString *kind) {
             snapshot.supportedBuild ? @"已支持" : @"已禁用", snapshot.executableUUID,
             state, (unsigned long)self.catalog.count, (unsigned long)self.catalog.trinketCount,
             (unsigned long)self.catalog.pocketItemCount,
-            (unsigned long)self.catalog.pillEffectCount] action:IDCCommandActionNone];
+            (unsigned long)self.catalog.pillEffectCount]
+                     action:IDCCommandActionNone];
     }
 
     if ([@[@"items", @"trinkets", @"cards", @"runes", @"pilleffects"]
@@ -310,99 +338,137 @@ static NSString *IDCKindLabelZH(NSString *kind) {
         if ([command isEqualToString:@"items"] && !argument.length) {
             return [self result:@"用法：items <name|id>" action:IDCCommandActionNone];
         }
+
         NSArray<IDCItemRecord *> *matches = [self recordsForListCommand:command
-                                                                   query:argument limit:30];
-        if (!matches.count) return [self result:@"没有匹配的条目。"
-                                               action:IDCCommandActionNone];
+                                                                   query:argument
+                                                                   limit:30];
+        if (!matches.count) {
+            return [self result:@"没有匹配的条目。" action:IDCCommandActionNone];
+        }
+
         NSString *prefix = [self prefixForListCommand:command];
         NSMutableArray<NSString *> *lines = [NSMutableArray array];
         for (IDCItemRecord *record in matches) {
             [lines addObject:[self labelForRecord:record prefix:prefix]];
         }
-        return [self result:[lines componentsJoinedByString:@"\n"] action:IDCCommandActionNone];
+        return [self result:[lines componentsJoinedByString:@"\n"]
+                     action:IDCCommandActionNone];
     }
 
     if (!snapshot.inGame) {
-        return [self result:@"该命令需要在进行中的游戏里使用。" action:IDCCommandActionNone];
+        return [self result:
+            @"An active run is required.（该命令需要在进行中的游戏里使用。）"
+                     action:IDCCommandActionNone];
     }
+
     if ([command isEqualToString:@"seed"]) {
         return [self result:snapshot.runSeed
             ? [NSString stringWithFormat:@"本局种子：%u (0x%08X)",
                snapshot.runSeed, snapshot.runSeed]
-            : @"无法获取种子。" action:IDCCommandActionNone];
+            : @"无法获取种子。"
+                     action:IDCCommandActionNone];
     }
+
     if ([command isEqualToString:@"room"]) {
         return [self result:snapshot.roomType
-            ? [NSString stringWithFormat:@"房间类型：%ld — %@", (long)snapshot.roomType,
-               [self roomName:snapshot.roomType]]
-            : @"无法获取房间类型。" action:IDCCommandActionNone];
+            ? [NSString stringWithFormat:@"房间类型：%ld — %@",
+               (long)snapshot.roomType, [self roomName:snapshot.roomType]]
+            : @"无法获取房间类型。"
+                     action:IDCCommandActionNone];
     }
+
     if ([command isEqualToString:@"position"]) {
-        return [self result:[NSString stringWithFormat:@"玩家类型 %ld，坐标：%.2f, %.2f",
+        return [self result:[NSString stringWithFormat:
+            @"玩家类型 %ld，坐标：%.2f, %.2f",
             (long)snapshot.playerType, snapshot.playerX, snapshot.playerY]
-                         action:IDCCommandActionNone];
+                     action:IDCCommandActionNone];
     }
+
     if ([command isEqualToString:@"inventory"]) {
         if (!snapshot.collectibleCounts.count) {
-            return [self result:@"没有找到已拥有的道具。" action:IDCCommandActionNone];
+            return [self result:@"没有找到已拥有的道具。"
+                         action:IDCCommandActionNone];
         }
+
         NSArray<NSNumber *> *identifiers = [snapshot.collectibleCounts.allKeys
             sortedArrayUsingSelector:@selector(compare:)];
         NSMutableArray<NSString *> *values = [NSMutableArray array];
+
         for (NSNumber *identifier in identifiers) {
             IDCItemRecord *record = [self.catalog recordForIdentifier:identifier.integerValue];
             NSString *name = record.name ?: [NSString stringWithFormat:@"道具 %@", identifier];
-            [values addObject:[NSString stringWithFormat:@"c%@ %@ ×%@", identifier, name,
-                               snapshot.collectibleCounts[identifier]]];
+            [values addObject:[NSString stringWithFormat:@"c%@ %@ ×%@",
+                identifier, name, snapshot.collectibleCounts[identifier]]];
         }
-        return [self result:[values componentsJoinedByString:@"\n"] action:IDCCommandActionNone];
+
+        return [self result:[values componentsJoinedByString:@"\n"]
+                     action:IDCCommandActionNone];
     }
+
     if ([command isEqualToString:@"giveitem"] || [command isEqualToString:@"remove"]) {
         NSString *lookupError = nil;
         IDCItemRecord *record = [self.catalog recordForSpecifier:argument error:&lookupError];
-        if (!record) return [self result:lookupError action:IDCCommandActionNone];
+        if (!record) {
+            return [self result:lookupError action:IDCCommandActionNone];
+        }
+
         NSString *nativeError = [command isEqualToString:@"giveitem"]
             ? [self.bridge giveCollectible:record.identifier]
             : [self.bridge removeCollectible:record.identifier];
         NSString *verb = [command isEqualToString:@"giveitem"] ? @"已添加" : @"已移除";
+
         return [self nativeResultForError:nativeError success:[NSString stringWithFormat:
             @"%@ c%ld — %@", verb, (long)record.identifier, record.name]];
     }
+
     if ([command isEqualToString:@"spawn"] || [command isEqualToString:@"spawnpickup"]) {
         NSUInteger componentCount = [command isEqualToString:@"spawn"] ? 3 : 2;
         NSArray<NSNumber *> *values = nil;
+
         if (![self parseUnsignedComponents:argument count:componentCount values:&values]) {
             return [self result:[NSString stringWithFormat:@"用法：%@", definition[@"usage"]]
-                             action:IDCCommandActionNone];
+                         action:IDCCommandActionNone];
         }
+
         NSInteger type = [command isEqualToString:@"spawn"] ? values[0].integerValue : 5;
         NSInteger index = [command isEqualToString:@"spawn"] ? 1 : 0;
         NSInteger variant = values[(NSUInteger)index].integerValue;
         NSInteger subtype = values[(NSUInteger)index + 1].integerValue;
+
         NSString *error = [self.bridge spawnEntityType:type variant:variant subtype:subtype];
         return [self nativeResultForError:error success:[NSString stringWithFormat:
-            @"已在玩家旁边生成 %ld.%ld.%ld。", (long)type, (long)variant,
-            (long)subtype]];
+            @"已在玩家旁边生成 %ld.%ld.%ld。",
+            (long)type, (long)variant, (long)subtype]];
     }
+
     if ([command isEqualToString:@"spawnitem"]) {
         NSString *lookupError = nil;
         IDCItemRecord *record = [self.catalog recordForSpecifier:argument error:&lookupError];
-        if (!record) return [self result:lookupError action:IDCCommandActionNone];
+        if (!record) {
+            return [self result:lookupError action:IDCCommandActionNone];
+        }
+
         NSString *error = [self.bridge spawnEntityType:5 variant:100 subtype:record.identifier];
         return [self nativeResultForError:error success:[NSString stringWithFormat:
             @"已生成道具 c%ld — %@。", (long)record.identifier, record.name]];
     }
+
     if ([command isEqualToString:@"spawntrinket"]) {
         NSString *lookupError = nil;
         IDCItemRecord *record = [self.catalog trinketForSpecifier:argument error:&lookupError];
-        if (!record) return [self result:lookupError action:IDCCommandActionNone];
+        if (!record) {
+            return [self result:lookupError action:IDCCommandActionNone];
+        }
+
         NSString *error = [self.bridge spawnEntityType:5 variant:350 subtype:record.identifier];
         return [self nativeResultForError:error success:[NSString stringWithFormat:
             @"已生成饰品 t%ld — %@。", (long)record.identifier, record.name]];
     }
+
     if ([command isEqualToString:@"spawncard"] || [command isEqualToString:@"spawnrune"]) {
         BOOL rune = [command isEqualToString:@"spawnrune"];
         NSString *specifier = argument;
+
         if (rune && argument.length &&
             [argument rangeOfCharacterFromSet:
                 NSCharacterSet.decimalDigitCharacterSet.invertedSet].location == NSNotFound) {
@@ -411,66 +477,98 @@ static NSString *IDCKindLabelZH(NSString *kind) {
                 specifier = [NSString stringWithFormat:@"%ld", (long)(shortID + 31)];
             }
         }
+
         NSString *lookupError = nil;
         IDCItemRecord *record = [self.catalog pocketItemForSpecifier:specifier
             kind:rune ? @"rune" : @"card" error:&lookupError];
-        if (!record) return [self result:lookupError action:IDCCommandActionNone];
+        if (!record) {
+            return [self result:lookupError action:IDCCommandActionNone];
+        }
+
         NSString *error = [self.bridge spawnEntityType:5 variant:300 subtype:record.identifier];
         return [self nativeResultForError:error success:[NSString stringWithFormat:
-            @"已生成%@ %ld — %@。", rune ? @"符文" : @"卡牌",
-            (long)record.identifier, record.name]];
+            @"已生成%@ %ld — %@。",
+            rune ? @"符文" : @"卡牌", (long)record.identifier, record.name]];
     }
+
     if ([command isEqualToString:@"spawnpill"]) {
         NSString *query = [argument stringByTrimmingCharactersInSet:
             NSCharacterSet.whitespaceAndNewlineCharacterSet];
         BOOL horse = NO;
+
         NSRange lastSpace = [query rangeOfCharacterFromSet:NSCharacterSet.whitespaceCharacterSet
                                                    options:NSBackwardsSearch];
-        NSString *lastToken = lastSpace.location == NSNotFound ? query :
-            [query substringFromIndex:NSMaxRange(lastSpace)];
+        NSString *lastToken = lastSpace.location == NSNotFound
+            ? query : [query substringFromIndex:NSMaxRange(lastSpace)];
+
         if ([lastToken.lowercaseString isEqualToString:@"horse"] ||
             [lastToken.lowercaseString isEqualToString:@"horsepill"]) {
             horse = YES;
-            query = lastSpace.location == NSNotFound ? @"" : [[query substringToIndex:lastSpace.location]
+            query = lastSpace.location == NSNotFound
+                ? @""
+                : [[query substringToIndex:lastSpace.location]
+                    stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+        }
+
+        BOOL explicitEffect = [query.lowercaseString hasPrefix:@"effect "];
+        if (explicitEffect) {
+            query = [[query substringFromIndex:7]
                 stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
         }
-        BOOL explicitEffect = [query.lowercaseString hasPrefix:@"effect "];
-        if (explicitEffect) query = [[query substringFromIndex:7]
-            stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+
         query = [query stringByReplacingOccurrencesOfString:@"\"" withString:@""];
         BOOL numeric = query.length && [query rangeOfCharacterFromSet:
             NSCharacterSet.decimalDigitCharacterSet.invertedSet].location == NSNotFound;
         NSString *pillName = horse ? @"大药丸" : @"药丸";
+
         if (numeric && !explicitEffect) {
             NSInteger color = query.integerValue;
             if (color < 1 || color > 14) {
-                return [self result:@"药丸颜色必须在 1 到 14 之间。指定效果 ID 请用 ‘effect <id>’。"
-                                 action:IDCCommandActionNone];
+                return [self result:
+                    @"药丸颜色必须在 1 到 14 之间。指定效果 ID 请用 ‘effect <id>’。"
+                             action:IDCCommandActionNone];
             }
+
             NSInteger subtype = color | (horse ? (1 << 11) : 0);
             NSString *error = [self.bridge spawnEntityType:5 variant:70 subtype:subtype];
             return [self nativeResultForError:error success:[NSString stringWithFormat:
                 @"已生成%@，颜色 %ld。", pillName, (long)color]];
         }
+
         NSString *lookupError = nil;
         IDCItemRecord *effect = [self.catalog pillEffectForSpecifier:query error:&lookupError];
-        if (!effect) return [self result:lookupError action:IDCCommandActionNone];
+        if (!effect) {
+            return [self result:lookupError action:IDCCommandActionNone];
+        }
+
         NSInteger color = 0;
         NSString *error = [self.bridge spawnPillEffect:effect.identifier horse:horse
                                          resolvedColor:&color];
         return [self nativeResultForError:error success:[NSString stringWithFormat:
             @"已生成%@，颜色 %ld — %@。", pillName, (long)color, effect.name]];
     }
+
     if ([command isEqualToString:@"rewind"]) {
         NSString *error = [self.bridge rewind];
         return [self nativeResultForError:error success:@"已通过发光沙漏的逻辑触发回溯。"];
     }
+
     if ([command isEqualToString:@"restart"]) {
-        if (argument.length) return [self result:@"用法：restart（别名：rs）" action:IDCCommandActionNone];
+        if (argument.length) {
+            return [self result:
+                @"Usage: restart（用法：restart，别名：rs）"
+                         action:IDCCommandActionNone];
+        }
+
         NSString *error = [self.bridge restart];
-        if (error) return [self nativeResultForError:error success:@""];
-        return [self result:@"已排队执行新一局重开。" action:IDCCommandActionClose];
+        if (error) {
+            return [self nativeResultForError:error success:@""];
+        }
+
+        return [self result:@"已排队执行新一局重开。"
+                     action:IDCCommandActionClose];
     }
+
     return [self result:@"该命令尚未实现。" action:IDCCommandActionNone];
 }
 
@@ -487,29 +585,41 @@ static NSString *IDCKindLabelZH(NSString *kind) {
                            to:(NSMutableArray<IDCCommandSuggestion *> *)suggestions {
     for (IDCItemRecord *record in records) {
         [suggestions addObject:[self suggestion:[self labelForRecord:record prefix:prefix]
-            replacement:[NSString stringWithFormat:@"%@ %ld", command, (long)record.identifier]]];
+            replacement:[NSString stringWithFormat:@"%@ %ld",
+                         command, (long)record.identifier]]];
     }
 }
 
-- (NSArray<IDCCommandSuggestion *> *)suggestionsForInput:(NSString *)input limit:(NSUInteger)limit {
+- (NSArray<IDCCommandSuggestion *> *)suggestionsForInput:(NSString *)input
+                                                   limit:(NSUInteger)limit {
     NSString *trimmedLeading = [input stringByTrimmingCharactersInSet:
         NSCharacterSet.newlineCharacterSet];
-    NSRange whitespace = [trimmedLeading rangeOfCharacterFromSet:NSCharacterSet.whitespaceCharacterSet];
+    NSRange whitespace = [trimmedLeading rangeOfCharacterFromSet:
+        NSCharacterSet.whitespaceCharacterSet];
     NSMutableArray<IDCCommandSuggestion *> *suggestions = [NSMutableArray array];
+
     if (whitespace.location == NSNotFound) {
         NSString *needle = trimmedLeading.lowercaseString;
+
         for (NSDictionary<NSString *, id> *command in self.commands) {
             NSString *name = command[@"name"];
             BOOL matches = !needle.length || [name hasPrefix:needle];
+
             if (!matches) {
                 for (NSString *alias in command[@"aliases"]) {
-                    if ([alias hasPrefix:needle]) { matches = YES; break; }
+                    if ([alias hasPrefix:needle]) {
+                        matches = YES;
+                        break;
+                    }
                 }
             }
+
             if (!matches) continue;
+
             [suggestions addObject:[self suggestion:
                 [NSString stringWithFormat:@"%@ — %@", command[@"usage"], command[@"summary"]]
                 replacement:[name stringByAppendingString:@" "]]];
+
             if (suggestions.count >= limit) break;
         }
         return suggestions.copy;
@@ -518,65 +628,113 @@ static NSString *IDCKindLabelZH(NSString *kind) {
     NSString *token = [[trimmedLeading substringToIndex:whitespace.location] lowercaseString];
     NSDictionary *definition = [self commandForToken:token];
     if (!definition) return @[];
+
     NSString *command = definition[@"name"];
     NSString *argument = [[trimmedLeading substringFromIndex:NSMaxRange(whitespace)]
         stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
-    if ([command isEqualToString:@"giveitem"] || [command isEqualToString:@"remove"] ||
-        [command isEqualToString:@"items"] || [command isEqualToString:@"spawnitem"]) {
+
+    if ([command isEqualToString:@"giveitem"] ||
+        [command isEqualToString:@"remove"] ||
+        [command isEqualToString:@"items"] ||
+        [command isEqualToString:@"spawnitem"]) {
+
         for (IDCItemRecord *record in [self.catalog recordsMatching:argument limit:limit]) {
-            NSString *replacement = [NSString stringWithFormat:@"%@ c%ld", command,
-                                      (long)record.identifier];
-            [suggestions addObject:[self suggestion:[self itemLabel:record] replacement:replacement]];
+            NSString *replacement = [NSString stringWithFormat:@"%@ c%ld",
+                command, (long)record.identifier];
+            [suggestions addObject:[self suggestion:[self itemLabel:record]
+                replacement:replacement]];
         }
+
     } else if ([command isEqualToString:@"trinkets"] ||
                [command isEqualToString:@"spawntrinket"]) {
+
         [self addRecordSuggestions:[self.catalog trinketsMatching:argument limit:limit]
                            command:command prefix:@"t" to:suggestions];
+
     } else if ([command isEqualToString:@"cards"] ||
                [command isEqualToString:@"spawncard"] ||
                [command isEqualToString:@"runes"] ||
                [command isEqualToString:@"spawnrune"]) {
+
         BOOL rune = [command isEqualToString:@"runes"] ||
-            [command isEqualToString:@"spawnrune"];
-        [self addRecordSuggestions:[self.catalog pocketItemsMatching:argument
-                                     kind:rune ? @"rune" : @"card" limit:limit]
-                           command:command prefix:rune ? @"符文 " : @"卡牌 " to:suggestions];
+                    [command isEqualToString:@"spawnrune"];
+
+        [self addRecordSuggestions:
+            [self.catalog pocketItemsMatching:argument
+                                         kind:rune ? @"rune" : @"card"
+                                        limit:limit]
+                            command:command
+                             prefix:rune ? @"符文 " : @"卡牌 "
+                                 to:suggestions];
+
     } else if ([command isEqualToString:@"pilleffects"] ||
                [command isEqualToString:@"spawnpill"]) {
+
         NSString *query = argument;
-        if ([query.lowercaseString hasPrefix:@"effect "]) query = [query substringFromIndex:7];
-        NSArray<IDCItemRecord *> *effects = [self.catalog pillEffectsMatching:query limit:limit];
+        if ([query.lowercaseString hasPrefix:@"effect "]) {
+            query = [query substringFromIndex:7];
+        }
+
+        NSArray<IDCItemRecord *> *effects =
+            [self.catalog pillEffectsMatching:query limit:limit];
+
         for (IDCItemRecord *record in effects) {
-            NSString *replacement = [command isEqualToString:@"spawnpill"]
-                ? [NSString stringWithFormat:@"spawnpill effect %ld", (long)record.identifier]
-                : [NSString stringWithFormat:@"pilleffects %ld", (long)record.identifier];
-            [suggestions addObject:[self suggestion:[self labelForRecord:record prefix:@"效果 "]
+            NSString *replacement =
+                [command isEqualToString:@"spawnpill"]
+                ? [NSString stringWithFormat:@"spawnpill effect %ld",
+                   (long)record.identifier]
+                : [NSString stringWithFormat:@"pilleffects %ld",
+                   (long)record.identifier];
+
+            [suggestions addObject:[self suggestion:
+                [self labelForRecord:record prefix:@"效果 "]
                 replacement:replacement]];
         }
+
         if ([command isEqualToString:@"spawnpill"] && !argument.length) {
-            [suggestions insertObject:[self suggestion:@"spawnpill <color 1-14> [horse]（颜色 1-14，可选 horse 表示大药丸）"
-                replacement:@"spawnpill 1"] atIndex:0];
+            [suggestions insertObject:
+                [self suggestion:
+                    @"spawnpill <color 1-14> [horse]（颜色 1-14，可选 horse 表示大药丸）"
+                    replacement:@"spawnpill 1"]
+                atIndex:0];
         }
+
     } else if ([command isEqualToString:@"spawn"]) {
-        [suggestions addObject:[self suggestion:@"type.variant.subtype（示例：5.100.1 = 拾取物 · 道具 · 1）"
-            replacement:@"spawn 5.100.1"]];
+
+        [suggestions addObject:
+            [self suggestion:
+                @"type.variant.subtype（示例：5.100.1 = 拾取物 · 道具 · 1）"
+                replacement:@"spawn 5.100.1"]];
+
     } else if ([command isEqualToString:@"spawnpickup"]) {
-        [suggestions addObject:[self suggestion:@"variant.subtype（示例：100.1 = 道具 1）"
-            replacement:@"spawnpickup 100.1"]];
+
+        [suggestions addObject:
+            [self suggestion:
+                @"variant.subtype（示例：100.1 = 道具 1）"
+                replacement:@"spawnpickup 100.1"]];
+
     } else if ([command isEqualToString:@"help"]) {
+
         for (NSDictionary<NSString *, id> *entry in self.commands) {
             NSString *name = entry[@"name"];
-            if (!argument.length || [name hasPrefix:argument.lowercaseString]) {
+
+            if (!argument.length ||
+                [name hasPrefix:argument.lowercaseString]) {
+
                 [suggestions addObject:[self suggestion:
                     [NSString stringWithFormat:@"%@ — %@", name, entry[@"summary"]]
                     replacement:[NSString stringWithFormat:@"help %@", name]]];
+
                 if (suggestions.count >= limit) break;
             }
         }
     }
+
     if (suggestions.count > limit) {
-        [suggestions removeObjectsInRange:NSMakeRange(limit, suggestions.count - limit)];
+        [suggestions removeObjectsInRange:
+            NSMakeRange(limit, suggestions.count - limit)];
     }
+
     return suggestions.copy;
 }
 
